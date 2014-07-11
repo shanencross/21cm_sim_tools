@@ -11,23 +11,46 @@ import numexpr
 import numpy
 import scipy.interpolate as sp
 import healpy as hp
+import copy
+import math
+
 
 
 # Define a local second in Julian time - useful for duration calculation
 second_jul = 0.1 / 8640
 
 # Define pi - useful for evaluation expressions
-pi = numpy.pi
+pi = np.pi
 rtd=180/np.pi
 dtr=np.pi/180
 e=2.71828
 
-#function to interpolate weights and make the map using gsm galaxy model
-def makemap(freq,nside=None):
-    lfreq=np.log(freq)
-    outmap=np.exp(comp1function(lfreq))*(maps408[:,0]*comp2function(lfreq)+maps408[:,1]*comp3function(lfreq)+maps408[:,2]*comp4function(lfreq))
+
+def timemaps(maps,fwhm_degrees, eortime):
+    timemaps=[]
+    for index in range(len(eortime)):
+        testmap = galmap2eqmap(maps)
+        testmap = eqmap2azelmap(testmap,ut=eortime[index])
+        testmap = replace_with_earth(testmap)
+        timemaps.append(hp.smoothing(testmap,np.radians(fwhm_degrees),regression=False ))
+    return testmap
+
+def gencomponents():
+    #4444
+    components=np.loadtxt('components.dat')
+    comp1function=sp.UnivariateSpline(np.log(components[:,0]),np.log(components[:,1]),s=0.0001)
+    comp2function=sp.UnivariateSpline(np.log(components[:,0]),(components[:,2]),s=.00001)
+    comp3function=sp.UnivariateSpline(np.log(components[:,0]),(components[:,3]),s=.00001,k=2)
+    comp4function=sp.UnivariateSpline(np.log(components[:,0]),(components[:,4]),s=.00001)
+    haslam_map=np.loadtxt('component_maps_408locked.dat')
+    return(comp1function,comp2function,comp3function,comp4function,haslam_map)
+
+
+def makemap(freq,comp1function,comp2function,comp3function,comp4function,maps408,nside=None): 
+    lfreq = np.log(freq)
+    outmap = np.exp(comp1function(lfreq))*(maps408[:,0]*comp2function(lfreq)+maps408[:,1]*comp3function(lfreq)+maps408[:,2]*comp4function(lfreq))
     if nside:
-        outmap=hp.ud_grade(outmap,nside)
+        outmap = hp.ud_grade(outmap, nside)
     return outmap
     
 def cart_to_heal(cartmap,nside):
@@ -49,21 +72,17 @@ def cart_to_heal(cartmap,nside):
     outmap[hitmap>0]=outmap[hitmap>0]/hitmap[hitmap>0]
     return outmap
     
-def replace_with_earth(map,elcut=0):
-    """
-    function assumes input is horizon (az el) coordinate Healpix map. Replace all pixels
-    below elcut=0 (in degrees above the horizon) with 300 kelvin. To be made more detailed in some future version
-    """
-    nside=np.int(np.sqrt(len(map)/12))
-    outmap=copy(map)
-    pixlist=range(len(map))
-    htheta,hphi=hp.pix2ang(nside,pixlist)
-    elevation=np.pi/2. -htheta
-    outmap[elevation < elcut*dtr]=300.
+def replace_with_earth(mapIm, elcut=0):
+    nside = np.int(np.sqrt(len(mapIm)/12))
+    outmap = np.empty_like(mapIm)
+    pixlist = range(len(mapIm))
+    htheta, dummy_hphi = hp.pix2ang(nside, pixlist)
+    elevation = np.pi/2.0 - htheta
+    outmap[elevation < elcut*dtr] = 300.0
     return outmap
 
     
-def eqmap2azelmap(map,longi=-104.245,lat=34.4717,ut=12.0,year=2014,month=9,day=15):
+def eqmap2azelmap(map,longi=-104.245,lat=34.4717,ut=12.0,year=2014,month=5,day=29):
     """
     function to rotate celestial coord map to az el with brute force using tools below from Victor Roytman
     """
