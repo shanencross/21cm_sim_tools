@@ -73,13 +73,33 @@ def cart_to_heal(cartmap,nside):
     return outmap
     
 def replace_with_earth(mapIm, elcut=0):
-    nside = np.int(np.sqrt(len(mapIm)/12))
-    outmap = np.empty_like(mapIm)
-    pixlist = range(len(mapIm))
-    htheta, dummy_hphi = hp.pix2ang(nside, pixlist)
-    elevation = np.pi/2.0 - htheta
-    outmap[elevation < elcut*dtr] = 300.0
+
+#Peter's version of this function
+    nside=np.int(np.sqrt(len(mapIm)/12))
+    outmap=copy.copy(mapIm)
+    pixlist=range(len(mapIm))
+    htheta,hphi=hp.pix2ang(nside,pixlist)
+    elevation=np.pi/2. -htheta
+    outmap[elevation < elcut*dtr]=300.
     return outmap
+
+#Rory's version of this function - doesn't work properly
+#    nside = np.int(np.sqrt(len(mapIm)/12))
+#    print "nside:", nside #debug
+#    outmap = np.empty_like(mapIm)
+#    print "outmap 1:", outmap #debug
+#    pixlist = range(len(mapIm))
+#    print "pixlist[0]:", pixlist[0] #debug
+#    htheta, dummy_hphi = hp.pix2ang(nside, pixlist)
+#    print "htheta:", htheta #debug
+#    print "dummy_hphi:", dummy_hphi #debug
+#    elevation = np.pi/2.0 - htheta
+#    print "elevation:", elevation #debug
+#    print "elcut*dtr:", elcut*dtr #debug
+#    outmap[elevation < elcut*dtr] = 300.0
+#    print "outmap element:", outmap[elevation < elcut*dtr] #debug
+#    print "outmap 2:", outmap #debug
+#    return outmap
 
     
 def eqmap2azelmap(map,longi=-104.245,lat=34.4717,ut=12.0,year=2014,month=5,day=29):
